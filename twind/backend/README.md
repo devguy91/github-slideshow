@@ -19,7 +19,44 @@ Get a dev token (no auth provider needed): `GET /v1/dev/token?email=you@example.
 Background jobs (escrow auto-release): `arq app.jobs.worker.WorkerSettings`, or one-shot
 `python -m app.cli release-due`.
 
-## Test / lint
+## Testing
+
+Three layers, cheapest first.
+
+**1. Automated (no services needed, ~5s)**
+
+```bash
+pytest -q                                   # 42 tests: unit, guardrails, end-to-end API flow
+ruff check app tests && ruff format --check app tests
+```
+
+`tests/test_api_flow.py` drives the whole loop through the HTTP layer: onboarding → listing →
+feed → quote → order → Stripe webhook → ship → deliver → fit rating → twins/refund/relist →
+auto-release job. `tests/test_guardrails.py` asserts the spec's non-negotiables.
+
+**2. Scripted walkthrough against a running server**
+
+```bash
+alembic upgrade head && python -m app.cli seed-slices && python -m app.cli seed-demo
+uvicorn app.main:app --reload
+./scripts/walkthrough.sh            # fit passes → funds released → twins
+FIT=fail ./scripts/walkthrough.sh   # fit fails → funds held → refund
+```
+
+Prints each step's result. `seed-demo` creates two founding sellers (one per launch slice) with
+seven live listings so a new buyer sees a populated feed.
+
+**3. Manual, via Swagger**
+
+Open http://localhost:8000/docs, call `GET /v1/dev/token?email=you@example.com`, click
+*Authorize* and paste the token. Useful requests to poke at: `/me/body/match-count` with
+different query values, `/feed` before and after `PUT /me/body`, `/orders/quote` on a
+listing whose seller has a high accuracy score (protection fee waived).
+
+To move an order past the auto-release timer without waiting, set `auto_release_at` in the
+past and run `python -m app.cli release-due`.
+
+## Lint
 
 ```bash
 pytest -q
