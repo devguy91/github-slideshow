@@ -1,0 +1,29 @@
+# fly launch --no-deploy, then set secrets: fly secrets set TWIND_DATABASE_URL=... TWIND_JWT_SECRET=...
+app = "twind-api"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  TWIND_ENV = "prod"
+  TWIND_PAYMENTS_PROVIDER = "stripe"
+  TWIND_DEV_TOKEN_ENDPOINT = "false"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[http_service.checks]]
+  interval = "15s"
+  timeout = "2s"
+  grace_period = "10s"
+  method = "GET"
+  path = "/v1/health"
+
+[processes]
+  app = "sh -c 'alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000'"
+  worker = "arq app.jobs.worker.WorkerSettings"
