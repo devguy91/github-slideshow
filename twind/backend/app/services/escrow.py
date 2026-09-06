@@ -76,7 +76,9 @@ async def release(
 async def refund(
     session: AsyncSession, order: Order, payments: PaymentsProvider, note: str
 ) -> None:
-    _require(order, OrderStatus.delivered, OrderStatus.paid, OrderStatus.shipped)
+    _require(
+        order, OrderStatus.pending, OrderStatus.paid, OrderStatus.shipped, OrderStatus.delivered
+    )
     total = order.amount_pence + order.protection_fee_pence + order.shipping_pence
     ref = None
     if order.stripe_payment_intent_id:

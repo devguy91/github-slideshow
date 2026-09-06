@@ -383,3 +383,34 @@ async def test_slices_and_waitlist_referrals(client):
         "/v1/waitlist", json={"email": "a@example.com", "height_cm": 160, "usual_size": "UK 8"}
     )
     assert r.status_code == 201 and r.json()["referral_code"] == code
+
+
+async def test_second_payment_on_same_listing_is_refunded(actor, client, payments):
+    seller = await actor()
+    listing = await make_live_listing(seller)
+    b1, b2 = await actor(), await actor()
+    o1 = (await b1.post("/orders", json={"listing_id": listing["id"]})).json()["order"]
+    o2 = (await b2.post("/orders", json={"listing_id": listing["id"]})).json()["order"]
+    import uuid as _uuid
+
+    async with db.get_sessionmaker()() as s:
+        pi1 = (await s.get(Order, _uuid.UUID(o1["id"]))).stripe_payment_intent_id
+        pi2 = (await s.get(Order, _uuid.UUID(o2["id"]))).stripe_payment_intent_id
+    for pi in (pi1, pi2):
+        r = await client.post(
+            "/v1/webhooks/stripe",
+            json={"type": "payment_intent.succeeded", "data": {"object": {"id": pi}}},
+        )
+        assert r.status_code == 200
+    assert (await b1.get(f"/orders/{o1['id']}")).json()["status"] == "paid"
+    assert (await b2.get(f"/orders/{o2['id']}")).json()["status"] == "refunded"
+    assert len(payments.refunds) == 1
+
+
+async def test_follow_invalidates_cached_feed(actor):
+    seller = await actor()
+    listing = await make_live_listing(seller)
+    buyer = await actor()
+    assert (await buyer.get("/feed")).json()["items"][0]["reason"] == "match"  # cached now
+    await buyer.post(f"/users/{listing['seller']['id']}/follow")
+    assert (await buyer.get("/feed")).json()["items"][0]["reason"] == "following"

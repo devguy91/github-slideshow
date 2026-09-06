@@ -30,6 +30,7 @@ from app.schemas import (
     ShipIn,
 )
 from app.services import escrow, fees
+from app.services.feed import FeedCache
 from app.services.payments import get_payments
 from app.services.serializers import (
     fit_rating_out,
@@ -209,6 +210,10 @@ async def rate_fit(
         await recompute_tier(session, user, profile)
     await session.commit()
     await session.refresh(rating)
+    if became_twins:
+        cache = FeedCache(settings)
+        await cache.invalidate_user(user.id)
+        await cache.invalidate_user(order.seller_id)
     return fit_rating_out(rating, became_twins)
 
 

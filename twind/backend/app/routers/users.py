@@ -3,9 +3,10 @@ import uuid
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
-from app.auth import CurrentUser, Session
+from app.auth import CurrentUser, Session, SettingsDep
 from app.models import Follow, Listing, ListingStatus, User
 from app.schemas import ListingOut, PublicProfile
+from app.services.feed import FeedCache
 from app.services.serializers import listing_out, public_profile
 
 router = APIRouter()
@@ -36,7 +37,9 @@ async def user_listings(handle: str, session: Session) -> list[ListingOut]:
 
 
 @router.post("/users/{user_id}/follow", status_code=204)
-async def follow(user_id: uuid.UUID, user: CurrentUser, session: Session) -> None:
+async def follow(
+    user_id: uuid.UUID, user: CurrentUser, session: Session, settings: SettingsDep
+) -> None:
     if user_id == user.id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "cannot follow yourself")
     if not await session.get(User, user_id):
@@ -45,11 +48,15 @@ async def follow(user_id: uuid.UUID, user: CurrentUser, session: Session) -> Non
     if not exists:
         session.add(Follow(follower_id=user.id, followee_id=user_id))
         await session.commit()
+        await FeedCache(settings).invalidate_user(user.id)
 
 
 @router.delete("/users/{user_id}/follow", status_code=204)
-async def unfollow(user_id: uuid.UUID, user: CurrentUser, session: Session) -> None:
+async def unfollow(
+    user_id: uuid.UUID, user: CurrentUser, session: Session, settings: SettingsDep
+) -> None:
     row = await session.get(Follow, (user.id, user_id))
     if row:
         await session.delete(row)
         await session.commit()
+        await FeedCache(settings).invalidate_user(user.id)

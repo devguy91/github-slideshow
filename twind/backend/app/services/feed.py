@@ -63,6 +63,15 @@ class FeedCache:
                 self._redis = None
         _memory_cache[k] = (datetime.now(UTC).timestamp() + self._ttl, value)
 
+    async def invalidate_user(self, user_id: uuid.UUID) -> None:
+        k = self.key(user_id)
+        _memory_cache.pop(k, None)
+        if self._redis is not None:
+            try:
+                await self._redis.delete(k)
+            except Exception:
+                self._redis = None
+
     async def invalidate_slice(self, session: AsyncSession, slice_id: uuid.UUID | None) -> None:
         q = select(User.id)
         if slice_id is not None:

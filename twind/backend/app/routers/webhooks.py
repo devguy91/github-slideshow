@@ -9,19 +9,27 @@ from fastapi import APIRouter, Header, HTTPException, Request, status
 from sqlalchemy import select
 
 from app.auth import Session, SettingsDep
-from app.models import Listing, Order, OrderStatus
+from app.models import Listing, ListingStatus, Order, OrderStatus
 from app.services import escrow
+from app.services.payments import get_payments
 
 router = APIRouter()
 
 
-async def apply_payment_succeeded(session, payment_intent_id: str) -> Order | None:
+async def apply_payment_succeeded(session, payment_intent_id: str, settings) -> Order | None:
     order = await session.scalar(
         select(Order).where(Order.stripe_payment_intent_id == payment_intent_id)
     )
     if order is None or order.status != OrderStatus.pending:
         return order
     listing = await session.get(Listing, order.listing_id)
+    if listing.status != ListingStatus.live:
+        # Someone else paid first. Refund this buyer in full rather than double-selling.
+        await escrow.refund(
+            session, order, get_payments(settings), note="listing sold to another buyer first"
+        )
+        await session.commit()
+        return order
     escrow.mark_paid(order, listing)
     await session.commit()
     return order
@@ -52,5 +60,5 @@ async def stripe_webhook(
 
     if event.get("type") == "payment_intent.succeeded":
         pi = event["data"]["object"]["id"]
-        await apply_payment_succeeded(session, pi)
+        await apply_payment_succeeded(session, pi, settings)
     return {"received": True}
