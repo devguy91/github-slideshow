@@ -1,0 +1,79 @@
+{
+  "expo": {
+    "name": "Twind",
+    "slug": "twind",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "twind",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "app.twind.mobile",
+      "associatedDomains": ["applinks:twind.app", "applinks:www.twind.app"],
+      "infoPlist": {
+        "NSCameraUsageDescription": "Twind uses the camera so you can photograph items you are selling.",
+        "NSPhotoLibraryUsageDescription": "Twind uses your photo library so you can add photos to listings.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "app.twind.mobile",
+      "adaptiveIcon": {
+        "backgroundColor": "#FFF7F0"
+      },
+      "permissions": ["CAMERA", "READ_MEDIA_IMAGES"],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "twind.app", "pathPrefix": "/" },
+            { "scheme": "https", "host": "www.twind.app", "pathPrefix": "/" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Twind uses your photo library so you can add photos to listings.",
+          "cameraPermission": "Twind uses the camera so you can photograph items you are selling."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#E8643C"
+        }
+      ],
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.app.twind",
+          "enableGooglePay": true
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "00000000-0000-0000-0000-000000000000"
+      }
+    }
+  }
+}
